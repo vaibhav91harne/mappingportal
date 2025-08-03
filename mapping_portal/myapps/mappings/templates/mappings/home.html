@@ -1,0 +1,165 @@
+{% extends "mappingmaintain.html" %}
+
+{% block title %}Home - Mapping Portal{% endblock %}
+
+{% block content %}
+<style>
+    body {
+        overflow-x: hidden;
+    }
+    .left-panel {
+        padding-left: 0;
+        padding-right: 5px;
+        max-width: 250px;
+    }
+    .scrollable-table-container {
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 70vh;
+    }
+    table {
+        font-size: 0.85rem;
+    }
+</style>
+
+<!-- Navigation Menu Button -->
+<button class="btn btn-light btn-sm mb-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#navDrawer">
+    ☰ Menu
+</button>
+
+<!-- Offcanvas Navigation Panel -->
+<div class="offcanvas offcanvas-start" tabindex="-1" id="navDrawer" aria-labelledby="navDrawerLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="navDrawerLabel">Navigation</h5>
+        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+        <ul class="list-group">
+            <li class="list-group-item"><a href="{% url 'mappings:home' %}">🏠 Home</a></li>
+            <li class="list-group-item"><a href="{% url 'mappingmaintain:upload_mapping' %}">⬆️ Upload Mapping</a></li>
+            <li class="list-group-item"><a href="{% url 'mappingmaintain:export_mapping' %}">📤 Export Mapping</a></li>
+        </ul>
+    </div>
+</div>
+
+<div class="row">
+    <!-- LEFT PANEL: App & File Tree -->
+    <div class="col-md-3 left-panel border-end">
+        <h6 class="mt-2"><strong>Applications & Files</strong></h6>
+        <div class="accordion" id="fileAccordion">
+            {% for app_code, tables in appcode_files.items %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="appHeading{{ forloop.counter }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#appCollapse{{ forloop.counter }}">
+                        {{ app_code }}
+                    </button>
+                </h2>
+                <div id="appCollapse{{ forloop.counter }}" class="accordion-collapse collapse">
+                    <div class="accordion-body p-0">
+                        <div class="accordion" id="tableAccordion{{ forloop.counter }}">
+                              {% for table_name, files in tables.items %}
+                              <div class="accordion-item">
+                                  <h2 class="accordion-header" id="tableHeading{{ forloop.parentloop.counter }}{{ forloop.counter }}">
+                                      <div class="d-flex w-100 align-items-center">
+                                          <button class="accordion-button collapsed flex-grow-1"
+                                                  type="button"
+                                                  data-bs-toggle="collapse"
+                                                  data-bs-target="#tableCollapse{{ forloop.parentloop.counter }}{{ forloop.counter }}">
+                                              {{ table_name }}
+                                          </button>
+                                          <a href="{% url 'mappings:home' %}?app={{ app_code }}&table={{ table_name }}" class="ms-2 small text-decoration-none">🔍</a>
+                                      </div>
+                                  </h2>
+                                <div id="tableCollapse{{ forloop.parentloop.counter }}{{ forloop.counter }}" class="accordion-collapse collapse">
+                                    <div class="accordion-body p-0">
+                                        <ul class="list-group list-group-flush">
+                                            {% for file in files %}
+                                            <li class="list-group-item">
+                                                📄 <a href="{% url 'mappings:home' %}?app={{ app_code }}&table={{ table_name }}&file={{ file }}">{{ file }}</a>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL: JoinConditions and Mappings -->
+    <div class="col-md-9">
+        {% if joins or mappings %}
+        <h5 class="mt-2">Editing File: <code>{{ selected_file }}</code></h5>
+
+        <form method="post">
+            {% csrf_token %}
+
+            {% if joins %}
+            <h6 class="mt-4">🔗 Join Conditions</h6>
+            <div class="scrollable-table-container">
+                <table class="table table-bordered table-striped">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Mapping Ref Name</th>
+                            <th>Table 1</th>
+                            <th>Table 2</th>
+                            <th>Join Condition</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for join in joins %}
+                        <tr>
+                            <td><input name="join_{{ join.pk }}_mapping_ref_name" class="form-control form-control-sm" value="{{ join.mapping_ref_name }}"></td>
+                            <td><input name="join_{{ join.pk }}_table_1" class="form-control form-control-sm" value="{{ join.table_1 }}"></td>
+                            <td><input name="join_{{ join.pk }}_table_2" class="form-control form-control-sm" value="{{ join.table_2 }}"></td>
+                            <td><input name="join_{{ join.pk }}_join" class="form-control form-control-sm" value="{{ join.join }}"></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            {% if mappings %}
+            <h6 class="mt-4">📊 Mapping Definitions</h6>
+            <div class="scrollable-table-container">
+                <table class="table table-bordered table-striped">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Target App</th>
+                            <th>Target Table</th>
+                            <th>Target Column (Physical)</th>
+                            <th>Source App</th>
+                            <th>Source Table</th>
+                            <th>Source Column</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for map in mappings %}
+                        <tr>
+                            <td>{{ map.target_app_code }}</td>
+                            <td><input name="mapping_{{ map.s_no }}_target_table_name" class="form-control form-control-sm" value="{{ map.target_table_name }}"></td>
+                            <td><input name="mapping_{{ map.s_no }}_target_column_name_physical" class="form-control form-control-sm" value="{{ map.target_column_name_physical }}"></td>
+                            <td>{{ map.source_app_code }}</td>
+                            <td><input name="mapping_{{ map.s_no }}_source_table_name" class="form-control form-control-sm" value="{{ map.source_table_name }}"></td>
+                            <td><input name="mapping_{{ map.s_no }}_source_column_name" class="form-control form-control-sm" value="{{ map.source_column_name }}"></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            <button class="btn btn-primary mt-3">💾 Save Changes</button>
+        </form>
+        {% else %}
+        <div class="alert alert-info mt-4">📂 Select a mapping file from the left to view/edit.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
