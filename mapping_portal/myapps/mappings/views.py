@@ -51,16 +51,36 @@ def home(request):
 
     print("✅ Entered home view")
 
-    # Build a dictionary {app_code: [file1, file2]} using target_app_code
+    # Build a nested dictionary {app_code: {table_name: [file1, file2]}}
     appcode_files = {}
-    files = Mappings.objects.values_list('uploaded_file', 'target_app_code').distinct()
+    files = (
+        Mappings.objects.values_list(
+            'uploaded_file', 'target_app_code', 'target_table_name'
+        ).distinct()
+    )
     print(f"🔍 Found mapping files: {files}")
-    for file_name, app_code in files:
+    for file_name, app_code, table_name in files:
         if app_code not in appcode_files:
-            appcode_files[app_code] = []
-        appcode_files[app_code].append(file_name)
+            appcode_files[app_code] = {}
+        if table_name not in appcode_files[app_code]:
+            appcode_files[app_code][table_name] = []
+        appcode_files[app_code][table_name].append(file_name)
 
+    selected_app = request.GET.get('app')
+    selected_table = request.GET.get('table')
     selected_file = request.GET.get('file')
+
+    if not selected_file and selected_app and selected_table:
+        selected_file = (
+            Mappings.objects.filter(
+                target_app_code=selected_app,
+                target_table_name=selected_table
+            )
+            .values_list('uploaded_file', flat=True)
+            .distinct()
+            .first()
+        )
+
     print(f"📂 Selected file from request: {selected_file}")
 
     mappings = Mappings.objects.filter(uploaded_file=selected_file) if selected_file else None
@@ -135,13 +155,15 @@ def home(request):
                     )
 
         messages.success(request, "✅ Changes saved successfully.")
-        return redirect(f"{request.path}?file={selected_file}")
+        return redirect(f"{request.path}?app={selected_app}&table={selected_table}&file={selected_file}")
 
     return render(request, 'mappings/home.html', {
         'appcode_files': appcode_files,
         'mappings': mappings,
         'joins': joins,
-        'selected_file': selected_file
+        'selected_file': selected_file,
+        'selected_app': selected_app,
+        'selected_table': selected_table,
     })
 
 
