@@ -1,0 +1,225 @@
+{% extends "mappingmaintain.html" %}
+
+{% block title %}Home - Mapping Portal{% endblock %}
+
+{% block content %}
+<style>
+    body {
+        overflow-x: hidden;
+    }
+    .left-panel {
+        padding-left: 0;
+        padding-right: 5px;
+        max-width: 250px;
+    }
+    .scrollable-table-container {
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 70vh;
+    }
+    table {
+        font-size: 0.85rem;
+    }
+</style>
+
+<!-- Navigation Menu Button -->
+<button class="btn btn-light btn-sm mb-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#navDrawer">
+    ☰ Menu
+</button>
+
+<!-- Offcanvas Navigation Panel -->
+<div class="offcanvas offcanvas-start" tabindex="-1" id="navDrawer" aria-labelledby="navDrawerLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="navDrawerLabel">Navigation</h5>
+        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+        <ul class="list-group">
+            <li class="list-group-item"><a href="{% url 'mappings:home' %}">🏠 Home</a></li>
+            <li class="list-group-item"><a href="{% url 'mappingmaintain:upload_mapping' %}">⬆️ Upload Mapping</a></li>
+            <li class="list-group-item"><a href="{% url 'mappingmaintain:export_mapping' %}">📤 Export Mapping</a></li>
+        </ul>
+    </div>
+</div>
+
+<div class="row">
+    <!-- LEFT PANEL: App & File Tree -->
+    <div class="col-md-3 left-panel border-end">
+        <h6 class="mt-2"><strong>Applications & Files</strong></h6>
+        <div class="accordion" id="fileAccordion">
+            {% for app_code, files in appcode_files.items %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#collapse{{ forloop.counter }}">
+                        {{ app_code }}
+                    </button>
+                </h2>
+                <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse">
+                    <div class="accordion-body p-0">
+                        <ul class="list-group list-group-flush">
+                            {% for file in files %}
+                            <li class="list-group-item">
+                                📄 <a href="{% url 'mappings:home' %}?file={{ file }}">{{ file }}</a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL: JoinConditions and Mappings -->
+    <div class="col-md-9">
+        {% if joins or mappings %}
+        <h5 class="mt-2">Editing File: <code>{{ selected_file }}</code></h5>
+
+        <form method="post">
+            {% csrf_token %}
+
+            {% if joins %}
+            <h6 class="mt-4">🔗 Join Conditions</h6>
+            <div class="scrollable-table-container">
+                <table class="table table-bordered table-striped">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Mapping Ref Name</th>
+                            <th>Table 1</th>
+                            <th>Table 2</th>
+                            <th>Join Condition</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="joinTableBody">
+                        {% for join in joins %}
+                        <tr>
+                            <td><input name="join_{{ join.pk }}_mapping_ref_name" class="form-control form-control-sm" value="{{ join.mapping_ref_name }}"></td>
+                            <td><input name="join_{{ join.pk }}_table_1" class="form-control form-control-sm" value="{{ join.table_1 }}"></td>
+                            <td><input name="join_{{ join.pk }}_table_2" class="form-control form-control-sm" value="{{ join.table_2 }}"></td>
+                            <td><input name="join_{{ join.pk }}_join" class="form-control form-control-sm" value="{{ join.join }}"></td>
+                            <td>
+                                <input type="hidden" name="join_{{ join.pk }}_status" value="active">
+                                <button type="button" class="btn btn-danger btn-sm delete-row">Delete</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <!-- Template row for new join conditions -->
+                        <tr class="join-template d-none">
+                            <td><input name="join_new_0_mapping_ref_name" class="form-control form-control-sm"></td>
+                            <td><input name="join_new_0_table_1" class="form-control form-control-sm"></td>
+                            <td><input name="join_new_0_table_2" class="form-control form-control-sm"></td>
+                            <td><input name="join_new_0_join" class="form-control form-control-sm"></td>
+                            <td>
+                                <input type="hidden" name="join_new_0_status" value="active">
+                                <button type="button" class="btn btn-danger btn-sm delete-row">Delete</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button type="button" id="addJoinRow" class="btn btn-secondary btn-sm mt-2">Add Row</button>
+            </div>
+            {% endif %}
+
+            {% if mappings %}
+            <h6 class="mt-4">📊 Mapping Definitions</h6>
+            <div class="scrollable-table-container">
+                <table class="table table-bordered table-striped">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Target App</th>
+                            <th>Target Table</th>
+                            <th>Target Column (Physical)</th>
+                            <th>Source App</th>
+                            <th>Source Table</th>
+                            <th>Source Column (Physical)</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mappingTableBody">
+                        {% for map in mappings %}
+                        <tr>
+                            <td><input name="mapping_{{ map.s_no }}_target_app_code" class="form-control form-control-sm" value="{{ map.target_app_code }}"></td>
+                            <td><input name="mapping_{{ map.s_no }}_target_table_name" class="form-control form-control-sm" value="{{ map.target_table_name }}"></td>
+                            <td><input name="mapping_{{ map.s_no }}_target_column_name_physical" class="form-control form-control-sm" value="{{ map.target_column_name_physical }}"></td>
+                            <td><input name="mapping_{{ map.s_no }}_source_app_code" class="form-control form-control-sm" value="{{ map.source_app_code }}"></td>
+                            <td><input name="mapping_{{ map.s_no }}_source_table_name" class="form-control form-control-sm" value="{{ map.source_table_name }}"></td>
+                            <td><input name="mapping_{{ map.s_no }}_source_column_name_physical" class="form-control form-control-sm" value="{{ map.source_column_name_physical }}"></td>
+                            <td>
+                                <input type="hidden" name="mapping_{{ map.s_no }}_country_applicability" value="{{ map.country_applicability }}">
+                                <input type="hidden" name="mapping_{{ map.s_no }}_status" value="active">
+                                <button type="button" class="btn btn-danger btn-sm delete-row">Delete</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <!-- Template row for new mappings -->
+                        <tr class="mapping-template d-none">
+                            <td><input name="mapping_new_0_target_app_code" class="form-control form-control-sm"></td>
+                            <td><input name="mapping_new_0_target_table_name" class="form-control form-control-sm"></td>
+                            <td><input name="mapping_new_0_target_column_name_physical" class="form-control form-control-sm"></td>
+                            <td><input name="mapping_new_0_source_app_code" class="form-control form-control-sm"></td>
+                            <td><input name="mapping_new_0_source_table_name" class="form-control form-control-sm"></td>
+                            <td><input name="mapping_new_0_source_column_name_physical" class="form-control form-control-sm"></td>
+                            <td>
+                                <input type="hidden" name="mapping_new_0_country_applicability" value="">
+                                <input type="hidden" name="mapping_new_0_status" value="active">
+                                <button type="button" class="btn btn-danger btn-sm delete-row">Delete</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button type="button" id="addMappingRow" class="btn btn-secondary btn-sm mt-2">Add Row</button>
+            </div>
+            {% endif %}
+            <button class="btn btn-primary mt-3">💾 Save Changes</button>
+        </form>
+        {% else %}
+        <div class="alert alert-info mt-4">📂 Select a mapping file from the left to view/edit.</div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function addRow(templateSelector, tableBodySelector) {
+        const template = document.querySelector(templateSelector);
+        const tbody = document.querySelector(tableBodySelector);
+        let index = tbody.dataset.index ? parseInt(tbody.dataset.index) + 1 : 0;
+        tbody.dataset.index = index;
+        const clone = template.cloneNode(true);
+        clone.classList.remove('d-none', templateSelector.replace('.', ''));
+        clone.querySelectorAll('input').forEach(function(input) {
+            if (input.name) {
+                input.name = input.name.replace('new_0_', `new_${index}_`);
+            }
+            if (input.type !== 'hidden') {
+                input.value = '';
+            } else if (input.value === 'active') {
+                input.value = 'active';
+            }
+        });
+        tbody.appendChild(clone);
+    }
+
+    document.getElementById('addJoinRow')?.addEventListener('click', function() {
+        addRow('.join-template', '#joinTableBody');
+    });
+
+    document.getElementById('addMappingRow')?.addEventListener('click', function() {
+        addRow('.mapping-template', '#mappingTableBody');
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('delete-row')) {
+            const row = e.target.closest('tr');
+            const statusInput = row.querySelector('input[name$="_status"]');
+            if (statusInput) {
+                statusInput.value = 'inactive';
+            }
+            row.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endblock %}
